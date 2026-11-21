@@ -1,0 +1,23 @@
+cff-version: 1.2.0
+message: "If you reference or build on this working draft or verification suite, please cite it as below."
+type: software
+title: "Quantitative Stability, Exact CLT Asymptotics, and l^p-Stam Inequalities in Finite Free Information Theory (AI-Assisted Working Draft & Verification Suite)"
+authors:
+  - family-names: "Schubert"
+    given-names: "Tristan"
+date-released: "2026-11-19"
+version: "0.9.0-working-draft"
+keywords:
+  - "finite free probability"
+  - "finite free Stam inequality"
+  - "Fisher information"
+  - "central limit theorem"
+  - "p-Stam inequality"
+  - "interval arithmetic"
+  - "AI-assisted mathematics"
+abstract: >-
+  Human-directed, AI-assisted working draft and companion verification suite
+  studying quantitative stability around Hermite extremizers, exact finite free
+  CLT Fisher-information asymptotics, and l^p-Stam inequalities for finite free
+  additive convolution, including exact rational and 50-digit interval-arithmetic
+  certificates.
