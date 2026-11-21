@@ -24,6 +24,7 @@ Also generates publication figures:
 - fig_stam_clt.png
 """
 
+import argparse
 from fractions import Fraction
 from math import factorial
 import numpy as np
@@ -47,7 +48,10 @@ def roots_to_elementary(roots: np.ndarray) -> np.ndarray:
 
 
 def boxplus_coeffs(a: np.ndarray, b: np.ndarray) -> np.ndarray:
-    """Finite free additive convolution in the signed elementary coefficient basis."""
+    """Finite free additive convolution in the signed elementary coefficient basis:
+    a = [a_0, ..., a_n] with p(x) = sum_{k=0}^n (-1)^k a_k x^{n-k} (a_k = e_k(roots)).
+    Note: because (-1)^i (-1)^j = (-1)^{i+j}, the same linear formula also holds on
+    plain descending polynomial coefficients [(-1)^k a_k]."""
     n = len(a) - 1
     c = np.zeros(n + 1, dtype=float)
     for k in range(n + 1):
@@ -106,7 +110,6 @@ def jacobian_alpha(alpha: np.ndarray, beta: np.ndarray) -> tuple[np.ndarray, np.
 
 def log_gas_laplacian(roots: np.ndarray) -> np.ndarray:
     """Weighted graph Laplacian L_ij = -2/(r_i - r_j)^2 (i != j), L_ii = -sum_{j!=i} L_ij."""
-    n = len(roots)
     diff = roots[:, None] - roots[None, :]
     np.fill_diagonal(diff, np.inf)
     L = -2.0 / (diff ** 2)
@@ -267,6 +270,8 @@ def verify_stam_hessian() -> None:
                     H_num[i, j] = H_num[j, i] = val
 
             H_exact = np.zeros((2 * n, 2 * n))
+            # Hessian matrix H = nabla^2 Delta_n carries factor 2 relative to the quadratic
+            # Taylor form Delta_n = (1/2) z^T H z displayed in Theorem 4.1 (4/[n(n-1)]^2 -> 8/[n(n-1)]^2).
             pref = 8.0 / ((n * (n - 1)) ** 2)
             for k in range(2, n):
                 c_k = pref * ((k + 1) ** 2)
@@ -940,14 +945,17 @@ def verify_score_identity_and_p_stam() -> None:
     u5_res = la5 * sa5 + lp5 * np.sum(xp5) * w_p5 + lm5 * np.sum(xm5) * w_m5
     v5_res = lb5 * sb5 + lp5 * np.sum(yp5) * w_p5 + lm5 * np.sum(ym5) * w_m5
     dual5_raw = float(la5 * (sa5 @ Ja5[:, 4]) + lb5 * (sb5 @ Jb5[:, 0]) + lp5 * val_p5 + lm5 * val_m5)
-    # On the compact sublevel set f(u,v) <= 2, doubly stochasticity gives ||u||_2 <= ||u||_1 <= 3 and ||v||_2 <= 3
+    # Heuristic float64 primal-dual cross-check (HiGHS LP solutions carry solver tolerance ~1e-8
+    # depending on SciPy version; res_penalty5 rigorously accounts for the LP residual on the
+    # compact sublevel set f(u,v) <= 2, while verify_interval_certificates_appendix_a() provides
+    # the standalone zero-residual 50-digit interval-arithmetic proof of inf f(u,v) >= 1.0021479).
     wsum5 = float(la5 + lb5 + lp5 + lm5)
     res_penalty5 = 3.0 * (float(np.linalg.norm(u5_res)) + float(np.linalg.norm(v5_res)))
     dual5_lb = (dual5_raw - res_penalty5) / wsum5
-    assert abs(wsum5 - 1.0) < 1e-12
-    assert max(float(np.max(np.abs(sa5))), float(np.max(np.abs(sb5)))) <= 1.0
-    assert float(np.linalg.norm(u5_res)) < 1e-14 and float(np.linalg.norm(v5_res)) < 1e-14
-    assert dual5_lb > 1.0025317 and primal5_min - dual5_lb < 1e-6
+    assert abs(wsum5 - 1.0) < 1e-10
+    assert max(float(np.max(np.abs(sa5))), float(np.max(np.abs(sb5)))) <= 1.0 + 1e-12
+    assert float(np.linalg.norm(u5_res)) < 1e-6 and float(np.linalg.norm(v5_res)) < 1e-6
+    assert dual5_lb > 1.0025 and primal5_min - dual5_lb < 1e-5
 
     # Check primal l^p(1^perp) contraction still holds on this n=5 pair
     max_p5_primal = 0.0
@@ -1183,8 +1191,48 @@ def verify_matrix_stam_edgeworth_and_unequal_scale() -> None:
             print(f"  Cor 5.2 two-term Edgeworth n={n} (g5={float(g5)}, g6={float(g6)}): |err|*m^3 = {mp.nstr(err_m3, 6)} (O(m^-3) confirmed)")
 
 
+def verify_exact_rational_quartic_certificate() -> None:
+    """Exact Q verification of Remark 4.9(i): c_4^(101) <= 876/1855 (and 761590/1625603 at c_0 = 21/10)."""
+    print("\n=== 0. Exact Rational Arithmetic Verification (Remark 4.9(i)) ===")
+
+    def _eval_quartic_dyson_q(c2_f: Fraction, c1_f: Fraction, c0_f: Fraction) -> tuple[Fraction, Fraction, Fraction]:
+        disc_f = (
+            256 * c0_f ** 3 - 128 * (c2_f ** 2) * (c0_f ** 2) + 144 * c2_f * (c1_f ** 2) * c0_f
+            - 27 * c1_f ** 4 + 16 * (c2_f ** 4) * c0_f - 4 * (c2_f ** 3) * (c1_f ** 2)
+        )
+        num_f = (
+            384 * c2_f * (c0_f ** 2) - 64 * (c2_f ** 3) * c0_f - 8 * c2_f ** 5
+            - 432 * (c1_f ** 2) * c0_f - 36 * (c2_f ** 2) * (c1_f ** 2)
+        )
+        ddisc_dc2 = -256 * c2_f * (c0_f ** 2) + 144 * (c1_f ** 2) * c0_f + 64 * (c2_f ** 3) * c0_f - 12 * (c2_f ** 2) * (c1_f ** 2)
+        ddisc_dc0 = 768 * (c0_f ** 2) - 256 * (c2_f ** 2) * c0_f + 144 * c2_f * (c1_f ** 2) + 16 * (c2_f ** 4)
+        dnum_dc2 = 384 * (c0_f ** 2) - 192 * (c2_f ** 2) * c0_f - 40 * (c2_f ** 4) - 72 * c2_f * (c1_f ** 2)
+        dnum_dc0 = 768 * c2_f * c0_f - 64 * (c2_f ** 3) - 432 * (c1_f ** 2)
+        disc_dot = -6 * ddisc_dc2 - c2_f * ddisc_dc0
+        num_dot = -6 * dnum_dc2 - c2_f * dnum_dc0
+        inv_phi = disc_f / num_f
+        pdot = (disc_dot * num_f - disc_f * num_dot) / (num_f ** 2)
+        h1 = Fraction(1, 3)
+        r4_lim = (pdot - h1) / (4 * inv_phi * (1 - inv_phi / h1))
+        return inv_phi, pdot, r4_lim
+
+    # Integer quartic q(x) = x^4 - 6x^2 + 2x + 2
+    q_signs = [x ** 4 - 6 * x ** 2 + 2 * x + 2 for x in (-3, -1, 0, 1, 3)]
+    assert q_signs == [23, -5, 2, -1, 35]
+    inv_phi_1, pdot_1, r4_1 = _eval_quartic_dyson_q(Fraction(-6), Fraction(2), Fraction(2))
+    assert inv_phi_1 == Fraction(53, 180) and pdot_1 == Fraction(448, 1125) and r4_1 == Fraction(876, 1855)
+    print(f"  Integer quartic x^4 - 6x^2 + 2x + 2: c_4^(101) <= {r4_1} = {float(r4_1):.6f} < 1/2")
+
+    # Rational quartic with c_0 = 21/10
+    q2_signs = [Fraction(x) ** 4 - 6 * Fraction(x) ** 2 + 2 * Fraction(x) + Fraction(21, 10) for x in (-3, -1, 0, 1, 3)]
+    assert q2_signs[0] > 0 and q2_signs[1] < 0 and q2_signs[2] > 0 and q2_signs[3] < 0 and q2_signs[4] > 0
+    _, _, r4_2 = _eval_quartic_dyson_q(Fraction(-6), Fraction(2), Fraction(21, 10))
+    assert r4_2 == Fraction(761590, 1625603)
+    print(f"  Rational quartic c_0 = 21/10:        c_4^(101) <= {r4_2} = {float(r4_2):.6f} < 1/2")
+
+
 def verify_interval_certificates_appendix_a() -> None:
-    print("\n=== 5c. Rigorous 50-Digit Interval-Arithmetic Verification of Appendix A Certificates ===")
+    print("\n=== 0b. Rigorous 50-Digit Interval-Arithmetic Verification of Appendix A Certificates ===")
     prev_iv_dps = iv.dps
     iv.dps = 50
     try:
@@ -1276,7 +1324,10 @@ def verify_interval_certificates_appendix_a() -> None:
             rq_iv = num_iv / sum(v * v for v in z_iv)
             c4_ub_iv = (1 - rq_iv) / (4 * t_q * (1 - t_q))
             assert float(rq_iv.a) >= 0.749478769775 and float(c4_ub_iv.b) < 0.31413321
-            print(f"  Cert A.1 (mpmath.iv): Rayleigh in [{mp.nstr(rq_iv.a, 14)}, {mp.nstr(rq_iv.b, 14)}], c_4^(100) <= {mp.nstr(c4_ub_iv.b, 12)} < 1/3")
+            print(
+                f"  Cert A.1 (mpmath.iv): Rayleigh in [{mp.nstr(mp.mpf(rq_iv.a), 14)}, {mp.nstr(mp.mpf(rq_iv.b), 14)}], "
+                f"c_4^(100) <= {mp.nstr(mp.mpf(c4_ub_iv.b), 12)} < 0.31413321 < 1/3"
+            )
 
             # Certificate A.2: Zero-residual disjoint-support degree-5 linear-extension obstruction
             a5_iv = [iv.mpf(-128) / 125, iv.mpf(-251) / 250, iv.mpf(-123) / 125, iv.mpf(-241) / 250, iv.mpf(497) / 125]
@@ -1330,7 +1381,7 @@ def verify_interval_certificates_appendix_a() -> None:
                 + l2_iv * (dot_iv(w2_iv, matvec_iv(Ja5_iv, x2_iv)) + dot_iv(w2_iv, matvec_iv(Jb5_iv, y2_iv)))
             )
             assert float(lb_iv.a) >= 1.002147929052
-            print(f"  Cert A.2 (mpmath.iv, zero residual): max|s_a| <= {max_sa:.6f} < 1, inf f(u,v) >= {mp.nstr(lb_iv.a, 14)} > 1")
+            print(f"  Cert A.2 (mpmath.iv, zero residual): max|s_a| <= {max_sa:.6f} < 1, inf f(u,v) >= {mp.nstr(mp.mpf(lb_iv.a), 14)} > 1")
     finally:
         iv.dps = prev_iv_dps
 
@@ -1426,9 +1477,9 @@ def generate_figures() -> None:
     ex_asym = clt_excess(a_asym)
     ex_sym = clt_excess(a_sym)
     ax.loglog(ms, ex_asym, "o", color="#1f77b4", label="Asymmetric ($e_3 \\neq 0$)")
-    ax.loglog(ms, c1 / ms, "--", color="#1f77b4", label=f"Theory $C_3 / m$")
+    ax.loglog(ms, c1 / ms, "--", color="#1f77b4", label="Theory $C_3 / m$")
     ax.loglog(ms, ex_sym, "s", color="#d62728", label="Symmetric ($e_3 = 0$)")
-    ax.loglog(ms, c2 / (ms ** 2), "--", color="#d62728", label=f"Theory $C_4 / m^2$")
+    ax.loglog(ms, c2 / (ms ** 2), "--", color="#d62728", label="Theory $C_4 / m^2$")
     ax.set_xlabel("Convolution count $m$")
     ax.set_ylabel("Relative Fisher excess $\\Phi_4^*(p_m)/\\Phi_4^*(He_4) - 1$")
     ax.set_title("(a) Finite Free CLT Convergence Rates ($n=4$)")
@@ -1465,12 +1516,33 @@ def generate_figures() -> None:
 
 
 if __name__ == "__main__":
-    verify_mpmath_high_precision()
-    verify_coupling_semigroup_and_mehler()
-    verify_stam_hessian()
-    verify_clt_rates()
-    verify_score_identity_and_p_stam()
-    verify_matrix_stam_edgeworth_and_unequal_scale()
+    parser = argparse.ArgumentParser(
+        description="Verification suite for Finite Free Stam Stability, CLT Asymptotics, and p-Stam Inequalities."
+    )
+    parser.add_argument(
+        "--certificates-only",
+        action="store_true",
+        help="Run only the exact rational (Remark 4.9(i)) and 50-digit mpmath.iv interval certificates (Appendix A).",
+    )
+    parser.add_argument(
+        "--no-figures",
+        action="store_true",
+        help="Skip regenerating publication PNG figures.",
+    )
+    args = parser.parse_args()
+
+    # Run rigorous exact-Q and 50-digit interval-arithmetic certificates first
+    verify_exact_rational_quartic_certificate()
     verify_interval_certificates_appendix_a()
-    generate_figures()
+
+    if not args.certificates_only:
+        verify_mpmath_high_precision()
+        verify_coupling_semigroup_and_mehler()
+        verify_stam_hessian()
+        verify_clt_rates()
+        verify_score_identity_and_p_stam()
+        verify_matrix_stam_edgeworth_and_unequal_scale()
+        if not args.no_figures:
+            generate_figures()
+
     print("\nALL VERIFICATIONS PASSED SUCCESSFULLY.")

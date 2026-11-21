@@ -17,7 +17,7 @@ This work was produced through a **human-directed, multi-agent AI research workf
 
 - **Analytic proofs (Sections 2–6):** Checked symbolically, numerically, and across multiple AI audit rounds, but **not yet verified line-by-line by a human specialist in finite free probability**.
 - **Exact rational proof (Remark 4.9(i)):** Verified in exact $\mathbb{Q}$ arithmetic (`fractions.Fraction`).
-- **Rigorous interval-arithmetic certificates (Appendix A, Remarks 4.9(iv) & 6.4):** Verified in 50-digit interval arithmetic (`mpmath.iv`) using explicit short integer/rational data printed in Appendix A (no numerical root-finders or eigensolvers inside the proof).
+- **Rigorous interval-arithmetic certificates (Appendix A, Remarks 4.9(iv) & 6.4):** Verified in 50-digit interval arithmetic (`mpmath.iv`) using explicit short integer/rational data printed in Appendix A (`mp.polyroots` is used only to propose candidate root brackets, which are then rigorously certified via interval sign-change, disjointness, and non-vanishing derivative enclosures, with no floating-point root-finder or eigensolver trusted inside the proof).
 - **Exploratory numerics (Table 2):** Clearly separated and labeled as numerical exploration only.
 
 Independent mathematical review, critique, bug reports, or collaboration from specialists in finite free probability are warmly welcomed.
@@ -29,7 +29,7 @@ Independent mathematical review, critique, bug reports, or collaboration from sp
 1. **Quantitative Finite Free Stam Stability (`arXiv:2609.10367`, Conjecture 8.1):**
    - Exact $2 \times 2$ block-diagonal Hessian of the Stam deficit $\Delta_n$ at every Hermite pair $(\sigma_1 r, \sigma_2 r)$ (Theorem 4.1) and sharp $n$-independent *asymptotic* local constant $c_n^{\mathrm{loc}} = 1/2$ (Corollary 4.2).
    - Algebraic proof via an Appell backward-heat Euler operator that literal $c_n = 1/2$ fails on every open neighborhood of *every* Hermite pair for all $n \ge 4$ (Theorem 4.4).
-   - Elementary cubic discriminant proof of global additive stability $\Delta_3 \ge 2t(1-t)(\delta_3(\alpha) + \delta_3(\beta))$ for $n = 3$ (Theorem 4.6), colliding-root obstruction for $n \ge 4$ (Proposition 4.5), Dyson-flow bound $c_n^{(101)} \le 2/n + O(n^{-2})$ (Proposition 4.7; exact rational quartic bound $c_4^{(101)} \le 876/1855$), and exact error-term-free bound $c_n^{(100)} \le \frac{1}{n-1}$ via the divided-difference defect operator $K(\beta) \succeq 0$ (Theorem 4.8; interval-certified $c_4^{(100)} \le 0.314134 < \frac{1}{3}$ in Appendix A).
+   - Elementary cubic discriminant proof of global additive stability $\Delta_3 \ge 2t(1-t)(\delta_3(\alpha) + \delta_3(\beta))$ for $n = 3$ (Theorem 4.6), colliding-root obstruction for $n \ge 4$ (Proposition 4.5), Dyson-flow bound $c_n^{(101)} \le 2/n + O(n^{-2})$ (Proposition 4.7; exact rational quartic bound $c_4^{(101)} \le 876/1855$), and exact error-term-free bound $c_n^{(100)} \le \frac{1}{n-1}$ via the divided-difference defect operator $K(\beta) \succeq 0$ (Theorem 4.8; interval-certified $c_4^{(100)} \le 0.31413321 < \frac{1}{3}$ in Appendix A).
 
 2. **Exact Finite Free CLT Fisher-Information Asymptotics (Section 5):**
    - Exact leading Fisher-information asymptotics for $m$-fold finite free convolution for any cumulant-matching order $j$, with parity vanishing of all half-integer powers of $m^{-1}$ (Theorem 5.1).
@@ -53,6 +53,8 @@ Independent mathematical review, critique, bug reports, or collaboration from sp
 | `fig_stam_clt.png` | Figure 2: Finite free CLT convergence rates and modal Stam deficit scaling |
 | `requirements.txt` | Python dependencies for `verify_theorems.py` |
 | `CITATION.cff` | Machine-readable citation metadata |
+| `LICENSE` | MIT License (code) and CC BY 4.0 notice (manuscript & figures) |
+| `.github/workflows/verify.yml` | GitHub Actions CI workflow running the verification suite |
 
 ---
 
@@ -60,10 +62,15 @@ Independent mathematical review, critique, bug reports, or collaboration from sp
 
 ```bash
 pip install -r requirements.txt
+
+# Fast check (~2 s): exact-Q quartic bound (Remark 4.9(i)) + 50-digit mpmath.iv Appendix A certificates
+python verify_theorems.py --certificates-only
+
+# Full suite (~1–2 min): rigorous certificates, all high-precision checks, exploratory Table 2 runs, and Figures 1–2
 python verify_theorems.py
 ```
 
-The script verifies all analytical formulas against high-precision computations, checks the exact rational quartic bound ($c_4^{(101)} \le 876/1855$), independently verifies both 50-digit `mpmath.iv` interval-arithmetic certificates from Appendix A (`Certificate A.1` and `Certificate A.2`), reproduces the exploratory Table 2 checks, and regenerates Figures 1–2.
+The script runs the rigorous exact-$\mathbb{Q}$ and 50-digit `mpmath.iv` interval-arithmetic certificates first, then checks all analytical formulas in Sections 3–6, reproduces the exploratory Table 2 checks, and regenerates Figures 1–2 (pass `--no-figures` to skip PNG generation).
 
 To recompile the PDF from source:
 
@@ -71,3 +78,7 @@ To recompile the PDF from source:
 pdflatex paper.tex
 pdflatex paper.tex
 ```
+
+## License
+
+Code (`verify_theorems.py`) is released under the **MIT License**; the manuscript and figures (`paper.tex`, `paper.pdf`, `paper.md`, `*.png`) are released under **CC BY 4.0** (see [`LICENSE`](LICENSE)).

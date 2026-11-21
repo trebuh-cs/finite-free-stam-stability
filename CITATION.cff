@@ -5,8 +5,10 @@ title: "Quantitative Stability, Exact CLT Asymptotics, and l^p-Stam Inequalities
 authors:
   - family-names: "Schubert"
     given-names: "Tristan"
-date-released: "2026-11-19"
-version: "0.9.0-working-draft"
+date-released: "2026-11-21"
+version: "0.9.1-working-draft"
+license: MIT
+repository-code: "https://github.com/trebuh-cs/finite-free-stam-stability"
 keywords:
   - "finite free probability"
   - "finite free Stam inequality"
